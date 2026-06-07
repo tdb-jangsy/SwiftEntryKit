@@ -248,10 +248,15 @@ final class EKWindowProvider: EntryPresenterDelegate {
     
     /** Dismiss entries according to a given descriptor */
     func dismiss(_ descriptor: SwiftEntryKit.EntryDismissalDescriptor, with completion: SwiftEntryKit.DismissCompletionHandler? = nil) {
+        // NOTE: Must always invoke `completion` on every path. With multilevel windows,
+        // `EKWindowProvider.dismiss` balances a DispatchGroup by calling each provider's
+        // completion; a provider that doesn't match (or has no rootVC) must still call it,
+        // otherwise the group never completes and the caller's completion is lost.
         guard let rootVC = rootVC else {
+            completion?()
             return
         }
-        
+
         switch descriptor {
         case .displayed:
             rootVC.animateOutLastEntry(completionHandler: completion)
@@ -259,14 +264,19 @@ final class EKWindowProvider: EntryPresenterDelegate {
             entryQueue.removeEntries(by: name)
             if entryView?.attributes.name == name {
                 rootVC.animateOutLastEntry(completionHandler: completion)
+            } else {
+                completion?()
             }
         case .prioritizedLowerOrEqualTo(priority: let priorityThreshold):
             entryQueue.removeEntries(withPriorityLowerOrEqualTo: priorityThreshold)
             if let currentPriority = entryView?.attributes.precedence.priority, currentPriority <= priorityThreshold {
                 rootVC.animateOutLastEntry(completionHandler: completion)
+            } else {
+                completion?()
             }
         case .enqueued:
             entryQueue.removeAll()
+            completion?()
         case .all:
             entryQueue.removeAll()
             rootVC.animateOutLastEntry(completionHandler: completion)
