@@ -50,6 +50,15 @@ class EKRootViewController: UIViewController {
         }
     }
 
+    /*
+     Guards against handling a screen (dim-area) tap more than once for the
+     same presented entry. `animateOut` is animated, so the root view controller
+     keeps receiving touches until the out-animation finishes; a rapid second tap
+     would otherwise re-enter `touchesEnded` and invoke `customTapActions` again.
+     Reset when a new entry is configured.
+     */
+    private var didHandleScreenTap = false
+
     override var shouldAutorotate: Bool {
         if lastAttributes == nil {
             return true
@@ -142,7 +151,10 @@ class EKRootViewController: UIViewController {
         removeLastEntry(lastAttributes: previousAttributes, keepWindow: true)
         
         lastAttributes = attributes
-        
+
+        // New entry presented — allow its screen tap to be handled once again.
+        didHandleScreenTap = false
+
         let entryContentView = EKContentView(withEntryDelegate: self)
         view.addSubview(entryContentView)
         entryContentView.setup(with: entryView)
@@ -200,6 +212,12 @@ class EKRootViewController: UIViewController {
 extension EKRootViewController {
     
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        // Ignore repeated taps while the current entry is being dismissed,
+        // otherwise customTapActions fire multiple times (e.g. resuming a
+        // continuation more than once → crash).
+        guard !didHandleScreenTap else { return }
+        didHandleScreenTap = true
+
         switch lastAttributes.screenInteraction.defaultAction {
         case .dismissEntry:
             lastEntry?.animateOut(pushOut: false)
