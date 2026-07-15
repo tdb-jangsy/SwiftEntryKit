@@ -216,6 +216,12 @@ extension EKRootViewController {
         // otherwise customTapActions fire multiple times (e.g. resuming a
         // continuation more than once → crash).
         guard !didHandleScreenTap else { return }
+
+        // The entry locks its own interaction when dismissal starts (animateOut),
+        // e.g. after a button action. A screen tap landing in that window must
+        // not fire customTapActions for the already-dismissing entry.
+        guard lastEntry?.isUserInteractionEnabled != false else { return }
+
         didHandleScreenTap = true
 
         switch lastAttributes.screenInteraction.defaultAction {

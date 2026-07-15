@@ -323,7 +323,17 @@ class EKContentView: UIView {
     
     // Animate out
     func animateOut(pushOut: Bool) {
-        
+
+        /*
+         Once dismissal starts the entry must stop receiving touches.
+         The out animation keeps the entry on screen, so without this lock a
+         button action can still fire after a screen-tap dismissal (or a rapid
+         second tap on a button), causing double handling - e.g. resuming a
+         continuation twice. Also serves as a reentrancy guard for animateOut.
+         */
+        guard isUserInteractionEnabled else { return }
+        isUserInteractionEnabled = false
+
         // Execute willDisappear action if needed
         contentView.attributes.lifecycleEvents.willDisappear?()
         
