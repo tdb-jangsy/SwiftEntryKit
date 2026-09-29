@@ -144,6 +144,8 @@ class EKContentView: UIView {
             spacerView?.layout(.top, to: .bottom, of: self)
         case .center:
             messageInAnchor = .centerY
+            // Fork: honor verticalOffset for centered entries as a centerY offset (positive moves the entry down).
+            inOffset = attributes.positionConstraints.verticalOffset
         }
         
         // Layout the content view inside the scroll view

@@ -161,7 +161,8 @@ public extension EKAttributes {
         /** The maximum size of the entry */
         public var maxSize: Size
 
-        /** The vertical offset from the top or bottom anchor */
+        /** The vertical offset from the top or bottom anchor.
+         For a centered entry, it is applied as a centerY offset: positive moves the entry down, negative moves it up. */
         public var verticalOffset: CGFloat
         
         /** Can be used to display the content outside the safe area margins such as on the notch of the iPhone X or the status bar itself. */
