@@ -222,9 +222,10 @@ class EKContentView: UIView {
         // Layout the scroll view horizontally inside the screen
         switch attributes.positionConstraints.size.width {
         case .offset(value: let offset):
-            layoutToSuperview(axis: .horizontally, offset: offset, priority: .must)
+            layoutHorizontally(.left, offset: offset, priority: .must)
+            layoutHorizontally(.right, offset: -offset, priority: .must)
         case .ratio(value: let ratio):
-            layoutToSuperview(.width, ratio: ratio, priority: .must)
+            layoutHorizontally(.width, ratio: ratio, priority: .must)
         case .constant(value: let constant):
             set(.width, of: constant, priority: .must)
         case .intrinsic:
@@ -249,11 +250,11 @@ class EKContentView: UIView {
         // Layout the scroll view according to the maximum width (if given any)
         switch attributes.positionConstraints.maxSize.width {
         case .offset(value: let offset):
-            layout(to: .left, of: superview!, relation: .greaterThanOrEqual, offset: offset)
-            layout(to: .right, of: superview!, relation: .lessThanOrEqual, offset: -offset)
+            layoutHorizontally(.left, relation: .greaterThanOrEqual, offset: offset)
+            layoutHorizontally(.right, relation: .lessThanOrEqual, offset: -offset)
         case .ratio(value: let ratio):
-            layoutToSuperview(.centerX)
-            layout(to: .width, of: superview!, relation: .lessThanOrEqual, ratio: ratio)
+            layoutHorizontally(.centerX)
+            layoutHorizontally(.width, relation: .lessThanOrEqual, ratio: ratio)
         case .constant(value: let constant):
             set(.width, of: constant, relation: .lessThanOrEqual)
             break
@@ -277,9 +278,29 @@ class EKContentView: UIView {
     
     // Setup layout constraints according to EKAttributes.PositionConstraints
     private func setupLayoutConstraints() {
-        layoutToSuperview(.centerX)
+        layoutHorizontally(.centerX)
         setupSize()
         setupMaxSize()
+    }
+
+    // Fork: Same as `layoutToSuperview(_:relation:ratio:offset:priority:)` for a horizontal attribute, but relates to
+    // the root view's safe area layout guide when `respectsHorizontalSafeArea` is set (otherwise the root view itself,
+    // which is the original behavior).
+    @discardableResult
+    private func layoutHorizontally(_ edge: QLAttribute, relation: QLRelation = .equal,
+                                    ratio: CGFloat = 1, offset: CGFloat = 0,
+                                    priority: QLPriority = .required) -> NSLayoutConstraint? {
+        guard isValidForQuickLayout, let superview else {
+            print("\(String(describing: self)) Error in func: \(#function)")
+            return nil
+        }
+        let item: Any = attributes.positionConstraints.respectsHorizontalSafeArea ? superview.safeAreaLayoutGuide : superview
+        let constraint = NSLayoutConstraint(item: self, attribute: edge, relatedBy: relation,
+                                            toItem: item, attribute: edge,
+                                            multiplier: ratio, constant: offset)
+        constraint.priority = priority
+        superview.addConstraint(constraint)
+        return constraint
     }
 
     // Setup general attributes

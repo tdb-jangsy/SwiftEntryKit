@@ -167,6 +167,12 @@ public extension EKAttributes {
         
         /** Can be used to display the content outside the safe area margins such as on the notch of the iPhone X or the status bar itself. */
         public var safeArea = SafeArea.empty(fillSafeArea: false)
+
+        /** Fork: When true, the entry's horizontal position, width and maximum width are measured against the
+         root view's safe area layout guide instead of its edges. The constraints follow the guide, so the entry
+         stays inside asymmetric horizontal insets (e.g. landscape notch, or a foldable's vertical status/sensor strip)
+         across rotations and size changes. Defaults to false, which keeps the original edge-based layout. */
+        public var respectsHorizontalSafeArea = false
         
         public var hasVerticalOffset: Bool {
             return verticalOffset > 0
