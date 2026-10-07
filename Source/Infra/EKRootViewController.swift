@@ -122,6 +122,13 @@ class EKRootViewController: UIViewController {
         backgroundView.fillSuperview()
     }
     
+    // Fork: Reserved regions (e.g. a foldable's division region) change with the device's posture, so let each entry
+    // re-evaluate the horizontal area it avoids them with.
+    override public func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        view.subviews.compactMap { $0 as? EKContentView }.forEach { $0.updateHorizontalArea() }
+    }
+
     override public func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         statusBar = previousStatusBar

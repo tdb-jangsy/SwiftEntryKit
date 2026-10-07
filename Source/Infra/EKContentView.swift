@@ -67,6 +67,12 @@ class EKContentView: UIView {
     
     // Content
     private var contentView: EKEntryView!
+
+    // Fork: The horizontal area the entry is laid out in when `avoidsDivisionRegion` is set (see `layoutHorizontally`).
+    // Its left / right constants are moved off an active division region by `updateHorizontalArea()`.
+    private var horizontalAreaGuide: UILayoutGuide?
+    private var horizontalAreaLeftConstraint: NSLayoutConstraint?
+    private var horizontalAreaRightConstraint: NSLayoutConstraint?
     
     // MARK: Setup
     required init?(coder aDecoder: NSCoder) {
@@ -278,14 +284,77 @@ class EKContentView: UIView {
     
     // Setup layout constraints according to EKAttributes.PositionConstraints
     private func setupLayoutConstraints() {
+        setupHorizontalAreaGuideIfNeeded()
         layoutHorizontally(.centerX)
         setupSize()
         setupMaxSize()
     }
 
+    // Fork: The item the horizontal area is measured from — the root view's safe area layout guide when
+    // `respectsHorizontalSafeArea` is set, otherwise the root view itself (original behavior).
+    private func horizontalBaseItem(of superview: UIView) -> Any {
+        return attributes.positionConstraints.respectsHorizontalSafeArea ? superview.safeAreaLayoutGuide : superview
+    }
+
+    // Fork: Adds the horizontal area guide when `avoidsDivisionRegion` is set. It starts equal to the base item and is
+    // narrowed to the trailing side of an active division region in `updateHorizontalArea()`.
+    private func setupHorizontalAreaGuideIfNeeded() {
+        guard attributes.positionConstraints.avoidsDivisionRegion, let superview else {
+            return
+        }
+        let base = horizontalBaseItem(of: superview)
+        let guide = UILayoutGuide()
+        superview.addLayoutGuide(guide)
+        let left = NSLayoutConstraint(item: guide, attribute: .left, relatedBy: .equal, toItem: base, attribute: .left, multiplier: 1, constant: 0)
+        let right = NSLayoutConstraint(item: guide, attribute: .right, relatedBy: .equal, toItem: base, attribute: .right, multiplier: 1, constant: 0)
+        NSLayoutConstraint.activate([
+            left,
+            right,
+            guide.topAnchor.constraint(equalTo: superview.topAnchor),
+            guide.bottomAnchor.constraint(equalTo: superview.bottomAnchor)
+        ])
+        horizontalAreaGuide = guide
+        horizontalAreaLeftConstraint = left
+        horizontalAreaRightConstraint = right
+        updateHorizontalArea()
+    }
+
+    // Fork: Moves the horizontal area onto the trailing side of an active vertical division region, or back to the
+    // full base area when there is none. Called from the root view controller on every layout pass, since reserved
+    // regions change with the device's posture.
+    func updateHorizontalArea() {
+        guard let superview, let left = horizontalAreaLeftConstraint, let right = horizontalAreaRightConstraint else {
+            return
+        }
+        var leftInset: CGFloat = 0
+        var rightInset: CGFloat = 0
+        #if canImport(UIKit, _version: 9127.0.85)
+        if #available(iOS 27.1, *) {
+            let area = attributes.positionConstraints.respectsHorizontalSafeArea ? superview.safeAreaLayoutGuide.layoutFrame : superview.bounds
+            let division = superview.reservedRegions(kind: .division).first {
+                $0.isActive && $0.frame.height > $0.frame.width && $0.frame.minX > area.minX && $0.frame.maxX < area.maxX
+            }
+            if let division {
+                // The division frame already includes the margins kept clear for interactive content.
+                if superview.effectiveUserInterfaceLayoutDirection == .rightToLeft {
+                    rightInset = area.maxX - division.frame.minX
+                } else {
+                    leftInset = division.frame.maxX - area.minX
+                }
+            }
+        }
+        #endif
+        if left.constant != leftInset {
+            left.constant = leftInset
+        }
+        if right.constant != -rightInset {
+            right.constant = -rightInset
+        }
+    }
+
     // Fork: Same as `layoutToSuperview(_:relation:ratio:offset:priority:)` for a horizontal attribute, but relates to
-    // the root view's safe area layout guide when `respectsHorizontalSafeArea` is set (otherwise the root view itself,
-    // which is the original behavior).
+    // the horizontal area guide when `avoidsDivisionRegion` is set, otherwise to the root view's safe area layout guide
+    // when `respectsHorizontalSafeArea` is set, otherwise to the root view itself (original behavior).
     @discardableResult
     private func layoutHorizontally(_ edge: QLAttribute, relation: QLRelation = .equal,
                                     ratio: CGFloat = 1, offset: CGFloat = 0,
@@ -294,7 +363,7 @@ class EKContentView: UIView {
             print("\(String(describing: self)) Error in func: \(#function)")
             return nil
         }
-        let item: Any = attributes.positionConstraints.respectsHorizontalSafeArea ? superview.safeAreaLayoutGuide : superview
+        let item: Any = horizontalAreaGuide ?? horizontalBaseItem(of: superview)
         let constraint = NSLayoutConstraint(item: self, attribute: edge, relatedBy: relation,
                                             toItem: item, attribute: edge,
                                             multiplier: ratio, constant: offset)
@@ -506,6 +575,14 @@ class EKContentView: UIView {
         
         // Execute didDisappear action if needed
         let didDisappear = contentView.content.attributes.lifecycleEvents.didDisappear
+
+        // Fork: The horizontal area guide lives on the root view, so remove it (and its constraints) with the entry.
+        if let horizontalAreaGuide {
+            superview?.removeLayoutGuide(horizontalAreaGuide)
+            self.horizontalAreaGuide = nil
+            horizontalAreaLeftConstraint = nil
+            horizontalAreaRightConstraint = nil
+        }
 
         // Remove the view from its superview and in a case of a view controller, from its parent controller.
         super.removeFromSuperview()

@@ -173,6 +173,13 @@ public extension EKAttributes {
          stays inside asymmetric horizontal insets (e.g. landscape notch, or a foldable's vertical status/sensor strip)
          across rotations and size changes. Defaults to false, which keeps the original edge-based layout. */
         public var respectsHorizontalSafeArea = false
+
+        /** Fork: When true and the root view has an active vertical division region (e.g. a foldable held like a book),
+         the entry is laid out in the area on the trailing side of the division instead of across it, so its controls
+         stay out of the fold. Width and maximum width are measured against that area. Re-evaluated on every layout
+         pass of the entry window. Requires the iOS 27.1 SDK and iOS 27.1 at runtime; otherwise it has no effect.
+         Defaults to false. */
+        public var avoidsDivisionRegion = false
         
         public var hasVerticalOffset: Bool {
             return verticalOffset > 0
