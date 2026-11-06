@@ -76,6 +76,11 @@ final class EKWindowProvider: EntryPresenterDelegate {
         providers.values.forEach { $0.layoutIfNeeded() }
     }
     
+    /** Fork: Whether a provider still presents entries in the given window. Unlike `provider(for:)`, creates no provider. */
+    static func isEntryWindowInUse(_ window: EKWindow) -> Bool {
+        return providers.values.contains { $0.entryWindow === window }
+    }
+
     /** Current entry window */
     var entryWindow: EKWindow!
     
@@ -139,6 +144,8 @@ final class EKWindowProvider: EntryPresenterDelegate {
             mainRollbackWindow = UIApplication.shared.keyWindow
         } else {
             entryVC = rootVC!
+            // Fork: The reused window may have been created before any window scene was connected.
+            entryWindow.attachToSceneIfNeeded()
         }
         return entryVC
     }
@@ -147,6 +154,10 @@ final class EKWindowProvider: EntryPresenterDelegate {
      Privately used to display an entry
      */
     private func display(entryView: EKEntryView, using attributes: EKAttributes, presentInsideKeyWindow: Bool, rollbackWindow: SwiftEntryKit.RollbackWindow) {
+        // Fork: An enqueued entry waits for the displayed one without touching the window. If that window has no scene, the
+        // displayed entry is invisible and can never be dismissed, so attach it first to let it show and drain the queue.
+        entryWindow?.attachToSceneIfNeeded()
+
         switch entryView.attributes.precedence {
         case .override(priority: _, dropEnqueuedEntries: let dropEnqueuedEntries):
             if dropEnqueuedEntries {
